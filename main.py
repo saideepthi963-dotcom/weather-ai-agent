@@ -1,18 +1,17 @@
-import requests
+from openai import OpenAI
+from dotenv import load_dotenv
 
-url = "https://api.open-meteo.com/v1/forecast"
+# Load variables from the .env file
+load_dotenv()
 
-params = {
-    "latitude": 32.7767,
-    "longitude": -96.7970,
-    "current": "temperature_2m"
-}
+# Create an OpenAI client
+client = OpenAI()
 
-response = requests.get(url, params=params)
+# Send a request to the LLM
+response = client.responses.create(
+    model="gpt-5.6-luna",
+    input="Explain what an API is in one simple sentence."
+)
 
-data = response.json()
-
-temperature = data["current"]["temperature_2m"]
-unit = data["current_units"]["temperature_2m"]
-
-print(f"Current temperature: {temperature}{unit}")
+# Print the LLM's answer
+print(response.output_text)
