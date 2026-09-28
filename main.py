@@ -64,49 +64,52 @@ weather_tool = {
     }
 }
 
-user_question = input("You: ")
+while True:
 
-response = client.responses.create(
-    model="gpt-5.6-luna",
-    input=user_question,
-    tools=[weather_tool]
-)
+    user_question = input("\nYou: ")
 
-# Look at the first thing the LLM returned
-output = response.output[0]
+    # Stop the program if the user types exit
+    if user_question.lower() == "exit":
+        print("AI: Goodbye!")
+        break
 
-# Check whether the LLM wants to call a function
-if output.type == "function_call":
-
-    print("LLM decided to use a tool.")
-
-    # Convert JSON arguments into a Python dictionary
-    arguments = json.loads(output.arguments)
-
-    city = arguments["city"]
-
-    # Execute our Python function
-    weather_result = get_weather(city)
-
-    print("Tool result:", weather_result)
-
-    # Send the tool result back to the LLM
-    final_response = client.responses.create(
+    response = client.responses.create(
         model="gpt-5.6-luna",
-        previous_response_id=response.id,
-        input=[
-            {
-                "type": "function_call_output",
-                "call_id": output.call_id,
-                "output": weather_result
-            }
-        ],
+        input=user_question,
         tools=[weather_tool]
     )
 
-    print("AI:", final_response.output_text)
+    output = response.output[0]
 
-else:
+    # Check whether the LLM wants to use a tool
+    if output.type == "function_call":
 
-    print("LLM decided no tool was needed.")
-    print("AI:", response.output_text)
+        print("LLM decided to use a tool.")
+
+        arguments = json.loads(output.arguments)
+
+        city = arguments["city"]
+
+        weather_result = get_weather(city)
+
+        print("Tool result:", weather_result)
+
+        final_response = client.responses.create(
+            model="gpt-5.6-luna",
+            previous_response_id=response.id,
+            input=[
+                {
+                    "type": "function_call_output",
+                    "call_id": output.call_id,
+                    "output": weather_result
+                }
+            ],
+            tools=[weather_tool]
+        )
+
+        print("AI:", final_response.output_text)
+
+    else:
+
+        print("LLM decided no tool was needed.")
+        print("AI:", response.output_text)
