@@ -142,61 +142,62 @@ weather_tool = {
         "required": ["city"]
     }
 }
-previous_response_id = None
-while True:
+def run_agent():
+    previous_response_id = None
 
-    user_question = input("\nYou: ")
+    while True:
+        user_question = input("\nYou: ")
 
-    # Stop the program if the user types exit
-    if user_question.lower() == "exit":
-        print("AI: Goodbye!")
-        break
+        if user_question.lower() == "exit":
+            print("AI: Goodbye!")
+            break
 
-    response = client.responses.create(
-    model="gpt-5.6-luna",
-    input=user_question,
-    tools=[weather_tool],
-    previous_response_id=previous_response_id
-)
-
-    output = response.output[0]
-
-    # Check whether the LLM wants to use a tool
-    if output.type == "function_call":
-
-        print("LLM decided to use a tool.")
-
-        arguments = json.loads(output.arguments)
-
-        city = arguments["city"]
-
-        weather_result = get_weather(city)
-
-        print("Tool result:", weather_result)
-
-        final_response = client.responses.create(
+        response = client.responses.create(
             model="gpt-5.6-luna",
-            previous_response_id=response.id,
-            input=[
-                {
-                    "type": "function_call_output",
-                    "call_id": output.call_id,
-                    "output": weather_result
-                }
-            ],
-            tools=[weather_tool]
+            input=user_question,
+            tools=[weather_tool],
+            previous_response_id=previous_response_id
         )
 
-        print("AI:", final_response.output_text)
-        previous_response_id = final_response.id
+        output = response.output[0]
 
-    else:
-        print("LLM decided no tool was needed.")
+        # Check whether the LLM wants to use a tool
+        if output.type == "function_call":
+            print("LLM decided to use a tool.")
 
-        if response.output_text:
-            print("AI:", response.output_text)
-            previous_response_id = response.id
+            arguments = json.loads(output.arguments)
+            city = arguments["city"]
+
+            weather_result = get_weather(city)
+
+            print("Tool result:", weather_result)
+
+            final_response = client.responses.create(
+                model="gpt-5.6-luna",
+                previous_response_id=response.id,
+                input=[
+                    {
+                        "type": "function_call_output",
+                        "call_id": output.call_id,
+                        "output": weather_result
+                    }
+                ],
+                tools=[weather_tool]
+            )
+
+            print("AI:", final_response.output_text)
+            previous_response_id = final_response.id
+
         else:
-            print("AI: I couldn't generate a response for that request.")
+            print("LLM decided no tool was needed.")
+
+            if response.output_text:
+                print("AI:", response.output_text)
+                previous_response_id = response.id
+            else:
+                print("AI: I couldn't generate a response for that request.")
+
+
+run_agent()
 
   
