@@ -4,6 +4,31 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 
+def get_weather_description(code):
+    weather_codes = {
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+        45: "Fog",
+        48: "Depositing rime fog",
+        51: "Light drizzle",
+        53: "Moderate drizzle",
+        55: "Dense drizzle",
+        61: "Slight rain",
+        63: "Moderate rain",
+        65: "Heavy rain",
+        71: "Slight snow",
+        73: "Moderate snow",
+        75: "Heavy snow",
+        80: "Slight rain showers",
+        81: "Moderate rain showers",
+        82: "Violent rain showers",
+        95: "Thunderstorm"
+    }
+
+    return weather_codes.get(code, "Unknown weather condition")
+
 def get_weather(city):
     # Step 1: Convert city name into latitude and longitude
     geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
@@ -27,10 +52,15 @@ def get_weather(city):
     weather_url = "https://api.open-meteo.com/v1/forecast"
 
     weather_params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "current": "temperature_2m"
-    }
+    "latitude": latitude,
+    "longitude": longitude,
+    "current": [
+        "temperature_2m",
+        "relative_humidity_2m",
+        "weather_code",
+        "wind_speed_10m"
+    ]
+}
 
     weather_response = requests.get(
         weather_url,
@@ -40,9 +70,22 @@ def get_weather(city):
     weather_data = weather_response.json()
 
     temperature = weather_data["current"]["temperature_2m"]
-    unit = weather_data["current_units"]["temperature_2m"]
+    humidity = weather_data["current"]["relative_humidity_2m"]
+    weather_code = weather_data["current"]["weather_code"]
+    weather_description = get_weather_description(weather_code)
+    wind_speed = weather_data["current"]["wind_speed_10m"]
 
-    return f"The current temperature in {city} is {temperature}{unit}"
+    temperature_unit = weather_data["current_units"]["temperature_2m"]
+    humidity_unit = weather_data["current_units"]["relative_humidity_2m"]
+    wind_unit = weather_data["current_units"]["wind_speed_10m"]
+
+    return (
+        f"Current weather in {city}: "
+        f"temperature {temperature}{temperature_unit}, "
+        f"humidity {humidity}{humidity_unit}, "
+        f"condition {weather_description}, "
+        f"wind speed {wind_speed} {wind_unit}."
+) 
 
 load_dotenv()
 
