@@ -63,7 +63,7 @@ weather_tool = {
         "required": ["city"]
     }
 }
-
+previous_response_id = None
 while True:
 
     user_question = input("\nYou: ")
@@ -74,10 +74,11 @@ while True:
         break
 
     response = client.responses.create(
-        model="gpt-5.6-luna",
-        input=user_question,
-        tools=[weather_tool]
-    )
+    model="gpt-5.6-luna",
+    input=user_question,
+    tools=[weather_tool],
+    previous_response_id=previous_response_id
+)
 
     output = response.output[0]
 
@@ -108,8 +109,10 @@ while True:
         )
 
         print("AI:", final_response.output_text)
+        previous_response_id = final_response.id
 
     else:
 
         print("LLM decided no tool was needed.")
         print("AI:", response.output_text)
+        previous_response_id = response.id
