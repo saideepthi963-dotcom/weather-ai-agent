@@ -1,8 +1,47 @@
 import requests
 import json
-import requests
 from openai import OpenAI
 from dotenv import load_dotenv
+
+
+class geocoding_response:
+    """Small wrapper around the Open-Meteo geocoding API."""
+
+    def __init__(self, city):
+        self.city = city
+        self.latitude = None
+        self.longitude = None
+        self.raw_data = {}
+
+    def fetch(self):
+        geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
+        geocoding_params = {"name": self.city, "count": 1}
+
+        try:
+            response = requests.get(
+                geocoding_url,
+                params=geocoding_params,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            raise ValueError(f"Could not connect to the location service for {self.city}.")
+
+        self.raw_data = response.json()
+        results = self.raw_data.get("results")
+        if not results:
+            raise ValueError(f"Could not find a city named {self.city}.")
+
+        first_result = results[0]
+        self.latitude = first_result["latitude"]
+        self.longitude = first_result["longitude"]
+        return {"latitude": self.latitude, "longitude": self.longitude}
+
+    def get_coordinates(self):
+        if self.latitude is None or self.longitude is None:
+            self.fetch()
+        return self.latitude, self.longitude
+
 
 def get_weather_description(code):
     weather_codes = {
@@ -31,43 +70,40 @@ def get_weather_description(code):
 
 def get_weather(city):
     # Step 1: Convert city name into latitude and longitude
-    geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
-
-    geocoding_params = {
-        "name": city,
-        "count": 1
-    }
-
-    geocoding_response = requests.get(
-        geocoding_url,
-        params=geocoding_params
-    )
-
-    geocoding_data = geocoding_response.json()
-
-    latitude = geocoding_data["results"][0]["latitude"]
-    longitude = geocoding_data["results"][0]["longitude"]
+    try:
+        geocoding = geocoding_response(city)
+        latitude, longitude = geocoding.get_coordinates()
+    except ValueError as exc:
+        return str(exc)
 
     # Step 2: Get weather using those coordinates
     weather_url = "https://api.open-meteo.com/v1/forecast"
 
     weather_params = {
-    "latitude": latitude,
-    "longitude": longitude,
-    "current": [
-        "temperature_2m",
-        "relative_humidity_2m",
-        "weather_code",
-        "wind_speed_10m"
-    ]
-}
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "weather_code",
+            "wind_speed_10m"
+        ]
+    }
 
-    weather_response = requests.get(
-        weather_url,
-        params=weather_params
-    )
+    try:
+        weather_response = requests.get(
+            weather_url,
+            params=weather_params,
+            timeout=10,
+        )
+        weather_response.raise_for_status()
+    except requests.RequestException:
+        return f"Could not retrieve weather data for {city}."
 
     weather_data = weather_response.json()
+
+    if "current" not in weather_data:
+        return f"Could not retrieve weather data for {city}."
 
     temperature = weather_data["current"]["temperature_2m"]
     humidity = weather_data["current"]["relative_humidity_2m"]
@@ -155,7 +191,12 @@ while True:
         previous_response_id = final_response.id
 
     else:
-
         print("LLM decided no tool was needed.")
-        print("AI:", response.output_text)
-        previous_response_id = response.id
+
+        if response.output_text:
+            print("AI:", response.output_text)
+            previous_response_id = response.id
+        else:
+            print("AI: I couldn't generate a response for that request.")
+
+  
